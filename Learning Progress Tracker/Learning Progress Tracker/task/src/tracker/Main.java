@@ -6,28 +6,21 @@ import java.util.*;
 
 public class Main {
 
-    public enum CompareCategory {
-        POPULARITY,
-        ACTIVITY,
-        DIFFICULTY;
-    }
     public static class Student {
         String firstName, lastName, emailAddress;
         int[] points;
 
+        // Helper list for unique email addresses
         public static ArrayList<String> emailAddressesTaken = new ArrayList<>();
 
         public Student(String firstName, String lastName, String emailAddress) {
             this.firstName = firstName;
             this.lastName = lastName;
             this.emailAddress = emailAddress;
+
             this.points = new int[4];
 
             emailAddressesTaken.add(this.emailAddress);
-        }
-
-        public String getEmailAddress() {
-            return this.emailAddress;
         }
 
         public void addPoints(int[] points) {
@@ -46,97 +39,99 @@ public class Main {
     }
 
     public static class Course {
-        private Set<Integer> studentsEnrolled;
-        private int completedTasks, pointsAchieved, totalPointsAchievable;
-        private String nameOfCourse;
 
-        public Course(String nameOfCourse, int totalPointsAchievable) {
-            this.studentsEnrolled = new TreeSet<>();
-            this.completedTasks = 0;
-            this.pointsAchieved = 0;
-
-            this.totalPointsAchievable = totalPointsAchievable;
-            this.nameOfCourse = nameOfCourse;
+        private static class StudentStats {
+            int studentID;
+            int totalPoints;
+            int totalTasks;
         }
 
-        public double averagePointsPerTask() {
-            return new BigDecimal(this.totalPointsAchievable / this.completedTasks)
-                    .setScale(1, RoundingMode.HALF_UP)
-                    .doubleValue();
+        private static class StudentStatComparator implements Comparator<StudentStats> {
+            @Override
+            public int compare(StudentStats thisStat, StudentStats thatStat) {
+                int result = Integer.compare(thisStat.totalPoints, thatStat.totalPoints);
+                return result == 0 ?
+                        -(Integer.compare(thisStat.studentID, thatStat.studentID)) : result;
+            }
         }
 
-        public int totalStudentsEnrolled() {
-            return studentsEnrolled.size();
+        String name;
+        int pointThreshold;
+
+        int totalPointsAccumulated;
+        int totalTasksAccumulated;
+
+        HashMap<Integer, StudentStats> studentStatsHashMap;
+
+        public Course(String name, int pointThreshold) {
+            this.name = name;
+            this.pointThreshold = pointThreshold;
+
+            this.totalPointsAccumulated = 0;
+            this.totalTasksAccumulated = 0;
+
+            this.studentStatsHashMap = new HashMap<>();
         }
 
-        public int getCompletedTasks() {
-            return this.completedTasks;
-        }
+        public void addStudentStats(int studentID, int points) {
+            if (studentStatsHashMap.containsKey(studentID)) {
+                StudentStats s = studentStatsHashMap.get(studentID);
 
-        public void enrollStudent(Integer id) {
-            studentsEnrolled.add(id);
-        }
+                s.totalPoints += points;
+                s.totalTasks++;
+            }
+            else {
+                StudentStats s = new StudentStats();
 
-        public int totalPointsAchieved() {
-            return this.pointsAchieved;
-        }
+                s.studentID = studentID;
+                s.totalPoints = points;
+                s.totalTasks = 1;
 
-        public void incrementCompletedTasks() {
-            this.completedTasks++;
-        }
-
-        public void addPointsAchieved(int points) {
-            this.pointsAchieved += points;
-        }
-
-        public static Comparator<Course> courseComparator(CompareCategory categoryName) {
-            switch (categoryName) {
-                case POPULARITY:
-                    new Comparator<Course>() {
-                        @Override
-                        public int compare(Course c1, Course c2) {
-                            int thisTotal = c1.totalStudentsEnrolled();
-                            int thatTotal = c2.totalStudentsEnrolled();
-                            return Integer.compare(thisTotal, thatTotal);
-                        }
-                    };
-                case ACTIVITY:
-                    new Comparator<Course>() {
-                        @Override
-                        public int compare(Course c1, Course c2) {
-                            int thisTotal = c1.getCompletedTasks();
-                            int thatTotal = c2.getCompletedTasks();
-                            return Integer.compare(thisTotal, thatTotal);
-                        }
-                    };
-                case DIFFICULTY:
-                    new Comparator<Course>() {
-                        @Override
-                        public int compare(Course c1, Course c2) {
-                            double thisTotal = c1.averagePointsPerTask();
-                            double thatTotal = c2.averagePointsPerTask();
-                            return Double.compare(thisTotal, thatTotal);
-                        }
-                    };
+                studentStatsHashMap.put(studentID, s);
             }
 
-            return null;
+            totalPointsAccumulated += points;
+            totalTasksAccumulated++;
+        }
+
+        public int getNumberOfEnrollments() {
+            return this.studentStatsHashMap.size();
+        }
+
+        public double getAveragePointsPerTask() {
+            return this.totalTasksAccumulated == 0 ? 0.0 : (double) this.totalPointsAccumulated / this.totalTasksAccumulated;
+        }
+
+        public void getTopLearners() {
+            System.out.println(this.name);
+            System.out.println("id    points    completed");
+
+            ArrayList<StudentStats> studentStatsList = new ArrayList<>(this.studentStatsHashMap.values());
+
+            studentStatsList.sort(new StudentStatComparator());
+
+            for (StudentStats s : studentStatsList) {
+                double percentageComplete = ((double) s.totalPoints / this.pointThreshold) * 100.0;
+                double percentageFormatted =
+                        new BigDecimal(percentageComplete)
+                                .setScale(2, RoundingMode.HALF_UP)
+                                .doubleValue();
+                System.out.printf("%-5d %-9d %.1f%% %n", s.studentID, s.totalPoints, percentageFormatted);
+            }
         }
     }
+
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
         HashMap<Integer, Student> studentList = new HashMap<>();
-
         HashMap<Integer, Course> courseList = new HashMap<>();
-        String[] courseNames = new String[]{
-            "Java", "DSA", "Databases", "Spring"
-        };
-        int[] coursePoints = new int[]{600, 400, 480, 550};
-        for (int i = 0; i < courseNames.length; i++)
-            courseList.put(i, new Course(courseNames[i], coursePoints[i]));
 
+        courseList.put(0, new Course("Java", 600));
+        courseList.put(1, new Course("DSA", 400));
+        courseList.put(2, new Course("Databases", 480));
+        courseList.put(3, new Course("Spring", 550));
 
         System.out.println("Learning Progress Tracker");
 
@@ -173,6 +168,7 @@ public class Main {
             }
             else if (inputFromUser.equals("statistics")) {
                 System.out.println("Type the name of a course to see details or 'back' to quit:");
+                findStatistics(scanner, courseList);
             }
             else if (inputFromUser.equals("exit")) {
                 System.out.println("Bye!");
@@ -187,38 +183,216 @@ public class Main {
         }
     }
 
-    private static void statistics(Scanner scanner,
-                                   HashMap<Integer, Course> courseList) {
-        System.out.println(allCourseStatistics(courseList));
+    private static void findStatistics(Scanner scanner,
+                                       HashMap<Integer, Course> courseList) {
+
+        findAllCoursesStatistics(courseList);
+
         while (scanner.hasNextLine()) {
             String input = scanner.nextLine().toLowerCase();
 
-            if (input.equals("back")) break;
+            if (input.equals("back")) {
+                break;
+            }
             else {
-                switch(input) {
-                    case "java" -> courseStatistics(courseList.get(0));
-                    case "dsa" -> courseStatistics(courseList.get(1));
-                    case "databases" -> courseStatistics(courseList.get(2));
-                    case "spring" -> courseStatistics(courseList.get(3));
-                    default -> System.out.println("Unknown course.");
+                boolean foundCourse = false;
+
+                for (Course c : courseList.values()) {
+                    if (input.equals(c.name.toLowerCase())) {
+                        c.getTopLearners();
+                        foundCourse = true;
+                        break;
+                    }
+                }
+
+                if (!foundCourse) System.out.println("Unknown course.");
+
+
+            }
+        }
+    }
+
+    private static void findAllCoursesStatistics(HashMap<Integer, Course> courseList) {
+        ArrayList<Course> courseArrayList = new ArrayList<>(courseList.values());
+
+        System.out.println(findMostAndLeastPopularCourse(courseArrayList));
+        System.out.println(findHighestAndLowestActiveCourse(courseArrayList));
+        System.out.println(findEasiestAndHardestCourse(courseArrayList));
+    }
+
+    private static String findEasiestAndHardestCourse(ArrayList<Course> courseList) {
+        StringBuilder sb = new StringBuilder();
+
+        courseList.sort((thisCourse, thatCourse) -> {
+            double thisAverage = thisCourse.getAveragePointsPerTask();
+            double thatAverage = thatCourse.getAveragePointsPerTask();
+
+            return -Double.compare(thisAverage, thatAverage);
+        });
+
+        // Edge case: no courses have students yet
+        if (courseList.get(0).getAveragePointsPerTask() == 0) {
+            return "Easiest course: n/a\nHardest course: n/a";
+        }
+        else {
+            sb.append("Easiest course: ");
+            double highestAverage = courseList.get(0).getAveragePointsPerTask();
+
+            sb.append(courseList.get(0).name);
+
+            for(int i = 1; i < courseList.size(); i++) {
+                Course c = courseList.get(i);
+
+                // There are multiple courses that share the same average
+                if (c.getAveragePointsPerTask() == highestAverage) {
+                    sb.append(", ").append(c.name);
                 }
             }
-        }
-    }
 
-    private static String allCourseStatistics(HashMap<Integer, Course> courseList) {
-        ArrayList<Course> sortedCourseList = new ArrayList<Course>(courseList.values());
-        sortedCourseList.removeIf(course -> course.totalStudentsEnrolled() == 0);
-        sortedCourseList.sort(Course.courseComparator(CompareCategory.POPULARITY));
-        StringBuilder mostPopular = new StringBuilder();
-        for (Course c : sortedCourseList) {
-            if (c.totalStudentsEnrolled() > 0) {
+            sb.append("\n");
+            sb.append("Hardest course: ");
 
+            double lowestAverage = -1.0;
+
+            for (int i = courseList.size()-1; i >= 0; i--) {
+                Course c = courseList.get(i);
+                double average = c.getAveragePointsPerTask();
+
+                if (average != highestAverage) {
+                    // Found first course
+                    if (lowestAverage == -1.0) {
+                        lowestAverage = average;
+
+                        sb.append(c.name);
+                    }
+                    // Found multiple courses with same activity values
+                    else if (average == lowestAverage) {
+                        sb.append(", ").append(c.name);
+                    }
+                }
             }
+
+            // Edge case: none of the courses are the hard
+            // (all courses are equally easy)
+            if (lowestAverage == -1.0) sb.append("n/a");
         }
+
+        return sb.toString();
     }
 
-    private static void courseStatistics(Course course) {
+    private static String findHighestAndLowestActiveCourse(ArrayList<Course> courseList) {
+        StringBuilder sb = new StringBuilder();
+
+        courseList.sort((thisCourse, thatCourse) -> {
+            int thisTotalTasks = thisCourse.totalTasksAccumulated;
+            int thatTotalTasks = thatCourse.totalTasksAccumulated;
+
+            return -Integer.compare(thisTotalTasks, thatTotalTasks);
+        });
+
+        // Edge case: no courses have students yet
+        if (courseList.get(0).getNumberOfEnrollments() == 0) {
+            return "Highest activity: n/a\nLowest activity: n/a";
+        }
+        else {
+            sb.append("Highest activity: ");
+            int highestActivity = courseList.get(0).totalTasksAccumulated;
+
+            sb.append(courseList.get(0).name);
+
+            for(int i = 1; i < courseList.size(); i++) {
+                Course c = courseList.get(i);
+
+                if (c.totalTasksAccumulated == highestActivity) {
+                    sb.append(", ").append(c.name);
+                }
+            }
+
+            sb.append("\n");
+            sb.append("Lowest activity: ");
+
+            int lowestActivity = -1;
+            for (int i = courseList.size()-1; i >= 0; i--) {
+                Course c = courseList.get(i);
+                int activityLevel = c.totalTasksAccumulated;
+
+                if (activityLevel != highestActivity) {
+                    // Found first course
+                    if (lowestActivity == -1) {
+                        lowestActivity = activityLevel;
+
+                        sb.append(c.name);
+                    }
+                    // Found multiple courses with same activity values
+                    else if (activityLevel == lowestActivity) {
+                        sb.append(", ").append(c.name);
+                    }
+                }
+            }
+
+            // Edge case: none of the courses are the least active
+            // (all courses are equally active)
+            if (lowestActivity == -1) sb.append("n/a");
+        }
+
+        return sb.toString();
+    }
+
+    private static String findMostAndLeastPopularCourse(ArrayList<Course> courseList) {
+        StringBuilder sb = new StringBuilder();
+
+        courseList.sort((thisCourse, thatCourse) -> {
+            int thisNumberOfEnrollments = thisCourse.getNumberOfEnrollments();
+            int thatNumberOfEnrollments = thatCourse.getNumberOfEnrollments();
+
+            return -Integer.compare(thisNumberOfEnrollments, thatNumberOfEnrollments);
+        });
+
+        // Edge case: no courses have students yet
+        if (courseList.get(0).getNumberOfEnrollments() == 0) {
+            return "Most popular: n/a\nLeast popular: n/a";
+        }
+        else {
+            sb.append("Most popular: ");
+            int maxEnrollments = courseList.get(0).getNumberOfEnrollments();
+
+            sb.append(courseList.get(0).name);
+
+            for(int i = 1; i < courseList.size(); i++) {
+                Course c = courseList.get(i);
+
+                if (c.getNumberOfEnrollments() == maxEnrollments) {
+                    sb.append(", ").append(c.name);
+                }
+            }
+
+            sb.append("\n");
+            sb.append("Least popular: ");
+
+            int minEnrollments = -1;
+            for (int i = courseList.size()-1; i >= 0; i--) {
+                Course c = courseList.get(i);
+                int numberOfEnrollments = c.getNumberOfEnrollments();
+                if (numberOfEnrollments != maxEnrollments) {
+                    // Found first course
+                    if (minEnrollments == -1) {
+                        minEnrollments = numberOfEnrollments;
+
+                        sb.append(c.name);
+                    }
+                    // Found multiple courses with same enrollment values
+                    else if (numberOfEnrollments == minEnrollments) {
+                        sb.append(", ").append(c.name);
+                    }
+                }
+            }
+
+            // Edge case: none of the courses are the least popular
+            // (all courses are equally popular)
+            if (minEnrollments == -1) sb.append("n/a");
+        }
+
+        return sb.toString();
     }
 
     private static void findStudent(Scanner scanner,
@@ -271,7 +445,7 @@ public class Main {
                         for (int i = 0; i < points.length; i++) {
                             try {
                                 int point = Integer.parseInt(pointsToBeAdded[i+1]);
-                                if (point > 0) {
+                                if (point >= 0) {
                                     points[i] = point;
                                 }
                                 else {
@@ -287,20 +461,20 @@ public class Main {
                             }
                         }
 
+                        // All clear, add the points to the student's record
                         if (!incorrectPointFormat) {
                             studentList.get(id).addPoints(points);
-                            // Statistics for Courses
+
                             for (int i = 0; i < points.length; i++) {
-                                int point = points[i];
+                                int coursePoints = points[i];
 
-                                if (point > 0) {
-                                    Course course = courseList.get(i);
-
-                                    course.enrollStudent(id);
-                                    course.addPointsAchieved(points[i]);
-                                    course.incrementCompletedTasks();
+                                // Makes sure non-zero values are being
+                                // added to the student's record.
+                                if (coursePoints > 0) {
+                                    courseList.get(i).addStudentStats(id, coursePoints);
                                 }
                             }
+
                             System.out.println("Points updated.");
                         }
                     }
